@@ -1,0 +1,36 @@
+[project]
+name = "finalproject-vorobiov-m26-555"
+version = "0.1.0"
+description = "Консольная платформа ValutaTrade Hub: регистрация, валютный кошелек, покупка и продажа валют, курсы из внешних API"
+readme = "README.md"
+authors = [
+    { name = "Ilya Vorobiov", email = "ivorobiov79@yandex.ru" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "prettytable>=3.18.0",
+]
+
+[project.scripts]
+project = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["valutatrade_hub", "main.py"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = ["venv", ".venv", "dist", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.0",
+]
