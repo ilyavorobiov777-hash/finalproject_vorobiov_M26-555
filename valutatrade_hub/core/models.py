@@ -105,3 +105,63 @@ class Wallet:
     def get_balance_info(self):
         """Информация о балансе."""
         return f"{self.currency_code}: {self._balance:.4f}"
+
+
+EXCHANGE_RATES = {
+    "EUR_USD": 1.0786,
+    "BTC_USD": 59337.21,
+    "RUB_USD": 0.01016,
+    "ETH_USD": 3720.00,
+}
+
+
+class Portfolio:
+    """Все кошельки одного пользователя."""
+
+    def __init__(self, user_id, wallets=None, user=None):
+        self._user_id = user_id
+        if wallets is None:
+            wallets = {}
+        self._wallets = wallets
+        self._user = user
+
+    @property
+    def user(self):
+        """Пользователь, которому принадлежит портфель."""
+        return self._user
+
+    @property
+    def wallets(self):
+        """Копия словаря кошельков."""
+        return self._wallets.copy()
+
+    def add_currency(self, currency_code):
+        """Добавление нового кошелька."""
+        if currency_code in self._wallets:
+            raise ValueError(f"Кошелек '{currency_code}' уже есть в портфеле")
+        self._wallets[currency_code] = Wallet(currency_code)
+
+    def get_wallet(self, currency_code):
+        """Кошелек по коду валюты."""
+        return self._wallets.get(currency_code)
+
+    def get_total_value(self, base_currency="USD", rates=None):
+        """Общая стоимость всех кошельков в базовой валюте."""
+        if rates is None:
+            rates = EXCHANGE_RATES
+        if base_currency == "USD":
+            base_rate = 1
+        elif f"{base_currency}_USD" in rates:
+            base_rate = rates[f"{base_currency}_USD"]
+        else:
+            raise ValueError(f"Неизвестная базовая валюта '{base_currency}'")
+        total = 0
+        for code, wallet in self._wallets.items():
+            if code == "USD":
+                rate = 1
+            elif f"{code}_USD" in rates:
+                rate = rates[f"{code}_USD"]
+            else:
+                raise ValueError(f"Не удалось получить курс для {code}→USD")
+            total += wallet.balance * rate
+        return total / base_rate
