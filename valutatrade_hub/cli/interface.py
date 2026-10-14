@@ -3,6 +3,7 @@
 import shlex
 
 from valutatrade_hub.core import usecases
+from valutatrade_hub.core.utils import format_amount
 
 
 def parse_args(parts):
@@ -58,5 +59,23 @@ def run():
                 print(f"Вы вошли как '{current_user.username}'")
             except ValueError as e:
                 print(e)
+        elif name == "show-portfolio":
+            if current_user is None:
+                print("Сначала выполните login")
+                continue
+            base = args.get("base", "USD").upper()
+            try:
+                rows, total = usecases.show_portfolio(current_user, base)
+            except ValueError as e:
+                print(e)
+                continue
+            if not rows:
+                print("У вас пока нет кошельков. Купите валюту командой buy.")
+                continue
+            print(f"Портфель пользователя '{current_user.username}' (база: {base}):")
+            for code, balance, value in rows:
+                print(f"- {code}: {format_amount(code, balance)} → {value:.2f} {base}")
+            print("---------------------------------")
+            print(f"ИТОГО: {total:,.2f} {base}")
         else:
             print(f"Неизвестная команда: {name}")
