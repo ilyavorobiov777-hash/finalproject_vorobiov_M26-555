@@ -43,3 +43,21 @@ def register(username, password):
     portfolios.append({"user_id": user_id, "wallets": {}})
     save_json(PORTFOLIOS_FILE, portfolios)
     return user_id
+
+
+def login(username, password):
+    """Вход пользователя в систему."""
+    users = load_json(USERS_FILE)
+    for item in users:
+        if item["username"] == username:
+            user = User(
+                item["user_id"],
+                item["username"],
+                item["hashed_password"],
+                item["salt"],
+                datetime.fromisoformat(item["registration_date"]),
+            )
+            if not user.verify_password(password):
+                raise ValueError("Неверный пароль")
+            return user
+    raise ValueError(f"Пользователь '{username}' не найден")

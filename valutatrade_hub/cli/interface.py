@@ -21,6 +21,7 @@ def parse_args(parts):
 def run():
     """Запускает основной цикл приложения."""
     print("Добро пожаловать в ValutaTrade Hub! Для выхода введите exit.")
+    current_user = None
     while True:
         command = input("> ").strip()
         if command == "":
@@ -44,6 +45,17 @@ def run():
                     f"Пользователь '{username}' зарегистрирован (id={user_id}). "
                     f"Войдите: login --username {username} --password ****"
                 )
+            except ValueError as e:
+                print(e)
+        elif name == "login":
+            username = args.get("username")
+            password = args.get("password")
+            if username is None or password is None:
+                print("Использование: login --username <имя> --password <пароль>")
+                continue
+            try:
+                current_user = usecases.login(username, password)
+                print(f"Вы вошли как '{current_user.username}'")
             except ValueError as e:
                 print(e)
         else:
