@@ -6,6 +6,7 @@ USERS_FILE = "data/users.json"
 PORTFOLIOS_FILE = "data/portfolios.json"
 RATES_FILE = "data/rates.json"
 CRYPTO_CODES = ["BTC", "ETH", "SOL"]
+RATES_TTL_SECONDS = 300
 
 
 def load_json(path):
@@ -25,3 +26,10 @@ def format_amount(code, amount):
     if code in CRYPTO_CODES:
         return f"{amount:.4f}"
     return f"{amount:.2f}"
+
+
+def format_rate(rate):
+    """Форматирует курс: 8 знаков для маленьких чисел, 2 для остальных."""
+    if rate < 1:
+        return f"{rate:.8f}"
+    return f"{rate:.2f}"

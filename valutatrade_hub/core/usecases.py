@@ -8,6 +8,7 @@ from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
 from valutatrade_hub.core.utils import (
     PORTFOLIOS_FILE,
     RATES_FILE,
+    RATES_TTL_SECONDS,
     USERS_FILE,
     load_json,
     save_json,
@@ -155,3 +156,36 @@ def sell(user, currency_code, amount):
     wallet.withdraw(amount)
     save_portfolio(portfolio)
     return rate, old_balance, wallet.balance, amount * rate
+
+
+def update_rates_from_stub():
+    """Записывает курсы из заглушки в rates.json."""
+    now = datetime.now().replace(microsecond=0).isoformat()
+    pairs = {}
+    for pair, rate in EXCHANGE_RATES.items():
+        pairs[pair] = {"rate": rate, "updated_at": now, "source": "stub"}
+    save_json(RATES_FILE, {"pairs": pairs, "last_refresh": now})
+
+
+def rates_are_fresh():
+    """Проверяет, что курсы в rates.json не старше RATES_TTL_SECONDS."""
+    data = load_json(RATES_FILE)
+    if "last_refresh" not in data:
+        return False
+    last_refresh = datetime.fromisoformat(data["last_refresh"])
+    age = (datetime.now() - last_refresh).total_seconds()
+    return age < RATES_TTL_SECONDS
+
+
+def get_rate(from_code, to_code):
+    """Курс одной валюты к другой и время обновления."""
+    if not rates_are_fresh():
+        update_rates_from_stub()
+    data = load_json(RATES_FILE)
+    try:
+        rate = get_usd_rate(from_code) / get_usd_rate(to_code)
+    except ValueError:
+        raise ValueError(
+            f"Курс {from_code}→{to_code} недоступен. Повторите попытку позже."
+        )
+    return rate, data["last_refresh"]

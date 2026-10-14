@@ -3,7 +3,7 @@
 import shlex
 
 from valutatrade_hub.core import usecases
-from valutatrade_hub.core.utils import format_amount
+from valutatrade_hub.core.utils import format_amount, format_rate
 
 
 def parse_args(parts):
@@ -111,5 +111,20 @@ def run():
                 print(f"Оценочная стоимость покупки: {total:,.2f} USD")
             else:
                 print(f"Оценочная выручка: {total:,.2f} USD")
+        elif name == "get-rate":
+            from_code = args.get("from", "").upper()
+            to_code = args.get("to", "").upper()
+            if from_code == "" or to_code == "":
+                print("Использование: get-rate --from <код> --to <код>")
+                continue
+            try:
+                rate, updated = usecases.get_rate(from_code, to_code)
+            except ValueError as e:
+                print(e)
+                continue
+            updated = updated.replace("T", " ")
+            print(f"Курс {from_code}→{to_code}: {format_rate(rate)} "
+                  f"(обновлено: {updated})")
+            print(f"Обратный курс {to_code}→{from_code}: {format_rate(1 / rate)}")
         else:
             print(f"Неизвестная команда: {name}")
