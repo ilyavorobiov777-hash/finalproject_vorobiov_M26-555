@@ -77,5 +77,39 @@ def run():
                 print(f"- {code}: {format_amount(code, balance)} → {value:.2f} {base}")
             print("---------------------------------")
             print(f"ИТОГО: {total:,.2f} {base}")
+        elif name == "buy" or name == "sell":
+            if current_user is None:
+                print("Сначала выполните login")
+                continue
+            code = args.get("currency", "").upper()
+            if code == "" or args.get("amount") is None:
+                print(f"Использование: {name} --currency <код> --amount <количество>")
+                continue
+            try:
+                amount = float(args["amount"])
+            except ValueError:
+                print("'amount' должен быть положительным числом")
+                continue
+            try:
+                if name == "buy":
+                    rate, old, new, total = usecases.buy(current_user, code, amount)
+                else:
+                    rate, old, new, total = usecases.sell(current_user, code, amount)
+            except ValueError as e:
+                print(e)
+                continue
+            if name == "buy":
+                print(f"Покупка выполнена: {format_amount(code, amount)} {code} "
+                      f"по курсу {rate} USD/{code}")
+            else:
+                print(f"Продажа выполнена: {format_amount(code, amount)} {code} "
+                      f"по курсу {rate} USD/{code}")
+            print("Изменения в портфеле:")
+            print(f"- {code}: было {format_amount(code, old)} "
+                  f"→ стало {format_amount(code, new)}")
+            if name == "buy":
+                print(f"Оценочная стоимость покупки: {total:,.2f} USD")
+            else:
+                print(f"Оценочная выручка: {total:,.2f} USD")
         else:
             print(f"Неизвестная команда: {name}")
