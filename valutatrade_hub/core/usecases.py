@@ -4,6 +4,7 @@ import hashlib
 import secrets
 from datetime import datetime
 
+from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
 from valutatrade_hub.core.utils import (
     PORTFOLIOS_FILE,
@@ -89,6 +90,7 @@ def load_portfolio(user):
 
 def show_portfolio(user, base="USD"):
     """Кошельки пользователя и их стоимость в базовой валюте."""
+    get_currency(base)
     portfolio = load_portfolio(user)
     rates = load_rates()
     total = portfolio.get_total_value(base, rates)
@@ -129,6 +131,7 @@ def buy(user, currency_code, amount):
     """Покупка валюты."""
     if amount <= 0:
         raise ValueError("'amount' должен быть положительным числом")
+    get_currency(currency_code)
     rate = get_usd_rate(currency_code)
     portfolio = load_portfolio(user)
     if portfolio.get_wallet(currency_code) is None:
@@ -144,6 +147,7 @@ def sell(user, currency_code, amount):
     """Продажа валюты."""
     if amount <= 0:
         raise ValueError("'amount' должен быть положительным числом")
+    get_currency(currency_code)
     portfolio = load_portfolio(user)
     wallet = portfolio.get_wallet(currency_code)
     if wallet is None:
@@ -179,6 +183,8 @@ def rates_are_fresh():
 
 def get_rate(from_code, to_code):
     """Курс одной валюты к другой и время обновления."""
+    get_currency(from_code)
+    get_currency(to_code)
     if not rates_are_fresh():
         update_rates_from_stub()
     data = load_json(RATES_FILE)

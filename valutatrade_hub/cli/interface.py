@@ -3,6 +3,12 @@
 import shlex
 
 from valutatrade_hub.core import usecases
+from valutatrade_hub.core.currencies import CURRENCIES
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.utils import format_amount, format_rate
 
 
@@ -66,6 +72,9 @@ def run():
             base = args.get("base", "USD").upper()
             try:
                 rows, total = usecases.show_portfolio(current_user, base)
+            except CurrencyNotFoundError:
+                print(f"Неизвестная базовая валюта '{base}'")
+                continue
             except ValueError as e:
                 print(e)
                 continue
@@ -95,6 +104,13 @@ def run():
                     rate, old, new, total = usecases.buy(current_user, code, amount)
                 else:
                     rate, old, new, total = usecases.sell(current_user, code, amount)
+            except InsufficientFundsError as e:
+                print(e)
+                continue
+            except CurrencyNotFoundError as e:
+                print(e)
+                print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                continue
             except ValueError as e:
                 print(e)
                 continue
@@ -119,6 +135,14 @@ def run():
                 continue
             try:
                 rate, updated = usecases.get_rate(from_code, to_code)
+            except CurrencyNotFoundError as e:
+                print(e)
+                print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                continue
+            except ApiRequestError as e:
+                print(e)
+                print("Повторите попытку позже или проверьте подключение к сети.")
+                continue
             except ValueError as e:
                 print(e)
                 continue
