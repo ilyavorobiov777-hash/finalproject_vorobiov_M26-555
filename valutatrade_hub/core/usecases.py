@@ -6,19 +6,16 @@ from datetime import datetime
 
 from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
-from valutatrade_hub.core.utils import (
-    PORTFOLIOS_FILE,
-    RATES_FILE,
-    RATES_TTL_SECONDS,
-    USERS_FILE,
-    load_json,
-    save_json,
-)
+from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.infra.settings import SettingsLoader
+
+db = DatabaseManager()
+settings = SettingsLoader()
 
 
 def register(username, password):
     """Регистрация нового пользователя."""
-    users = load_json(USERS_FILE)
+    users = db.load_users()
     for item in users:
         if item["username"] == username:
             raise ValueError(f"Имя пользователя '{username}' уже занято")
@@ -40,17 +37,17 @@ def register(username, password):
             "registration_date": user.registration_date.isoformat(),
         }
     )
-    save_json(USERS_FILE, users)
+    db.save_users(users)
 
-    portfolios = load_json(PORTFOLIOS_FILE)
+    portfolios = db.load_portfolios()
     portfolios.append({"user_id": user_id, "wallets": {}})
-    save_json(PORTFOLIOS_FILE, portfolios)
+    db.save_portfolios(portfolios)
     return user_id
 
 
 def login(username, password):
     """Вход пользователя в систему."""
-    users = load_json(USERS_FILE)
+    users = db.load_users()
     for item in users:
         if item["username"] == username:
             user = User(
@@ -68,7 +65,7 @@ def login(username, password):
 
 def load_rates():
     """Курсы из rates.json в виде словаря {"BTC_USD": 59337.21}."""
-    data = load_json(RATES_FILE)
+    data = db.load_rates()
     rates = {}
     for pair, info in data.get("pairs", {}).items():
         rates[pair] = info["rate"]
@@ -79,7 +76,7 @@ def load_rates():
 
 def load_portfolio(user):
     """Загружает портфель пользователя из portfolios.json."""
-    portfolios = load_json(PORTFOLIOS_FILE)
+    portfolios = db.load_portfolios()
     wallets = {}
     for item in portfolios:
         if item["user_id"] == user.user_id:
@@ -88,7 +85,7 @@ def load_portfolio(user):
     return Portfolio(user.user_id, wallets, user)
 
 
-def show_portfolio(user, base="USD"):
+def show_portfolio(user, base):
     """Кошельки пользователя и их стоимость в базовой валюте."""
     get_currency(base)
     portfolio = load_portfolio(user)
@@ -104,14 +101,14 @@ def show_portfolio(user, base="USD"):
 
 def save_portfolio(portfolio):
     """Сохраняет кошельки портфеля в portfolios.json."""
-    portfolios = load_json(PORTFOLIOS_FILE)
+    portfolios = db.load_portfolios()
     wallets = {}
     for code, wallet in portfolio.wallets.items():
         wallets[code] = {"balance": wallet.balance}
     for item in portfolios:
         if item["user_id"] == portfolio.user.user_id:
             item["wallets"] = wallets
-    save_json(PORTFOLIOS_FILE, portfolios)
+    db.save_portfolios(portfolios)
 
 
 def get_usd_rate(code):
@@ -168,17 +165,17 @@ def update_rates_from_stub():
     pairs = {}
     for pair, rate in EXCHANGE_RATES.items():
         pairs[pair] = {"rate": rate, "updated_at": now, "source": "stub"}
-    save_json(RATES_FILE, {"pairs": pairs, "last_refresh": now})
+    db.save_rates({"pairs": pairs, "last_refresh": now})
 
 
 def rates_are_fresh():
-    """Проверяет, что курсы в rates.json не старше RATES_TTL_SECONDS."""
-    data = load_json(RATES_FILE)
+    """Проверяет, что курсы в rates.json не устарели."""
+    data = db.load_rates()
     if "last_refresh" not in data:
         return False
     last_refresh = datetime.fromisoformat(data["last_refresh"])
     age = (datetime.now() - last_refresh).total_seconds()
-    return age < RATES_TTL_SECONDS
+    return age < settings.get("rates_ttl_seconds")
 
 
 def get_rate(from_code, to_code):
@@ -187,7 +184,7 @@ def get_rate(from_code, to_code):
     get_currency(to_code)
     if not rates_are_fresh():
         update_rates_from_stub()
-    data = load_json(RATES_FILE)
+    data = db.load_rates()
     try:
         rate = get_usd_rate(from_code) / get_usd_rate(to_code)
     except ValueError:

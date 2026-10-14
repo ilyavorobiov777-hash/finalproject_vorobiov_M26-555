@@ -10,6 +10,7 @@ from valutatrade_hub.core.exceptions import (
     InsufficientFundsError,
 )
 from valutatrade_hub.core.utils import format_amount, format_rate
+from valutatrade_hub.infra.settings import SettingsLoader
 
 
 def parse_args(parts):
@@ -69,7 +70,8 @@ def run():
             if current_user is None:
                 print("Сначала выполните login")
                 continue
-            base = args.get("base", "USD").upper()
+            default_base = SettingsLoader().get("default_base_currency")
+            base = args.get("base", default_base).upper()
             try:
                 rows, total = usecases.show_portfolio(current_user, base)
             except CurrencyNotFoundError:
