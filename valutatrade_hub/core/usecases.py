@@ -6,6 +6,7 @@ from datetime import datetime
 
 from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
+from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 
@@ -124,6 +125,7 @@ def get_usd_rate(code):
     return rates[pair]
 
 
+@log_action("BUY", verbose=True)
 def buy(user, currency_code, amount):
     """Покупка валюты."""
     if amount <= 0:
@@ -140,6 +142,7 @@ def buy(user, currency_code, amount):
     return rate, old_balance, wallet.balance, amount * rate
 
 
+@log_action("SELL", verbose=True)
 def sell(user, currency_code, amount):
     """Продажа валюты."""
     if amount <= 0:

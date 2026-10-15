@@ -11,6 +11,7 @@ from valutatrade_hub.core.exceptions import (
 )
 from valutatrade_hub.core.utils import format_amount, format_rate
 from valutatrade_hub.infra.settings import SettingsLoader
+from valutatrade_hub.logging_config import setup_logging
 
 
 def parse_args(parts):
@@ -28,6 +29,7 @@ def parse_args(parts):
 
 def run():
     """Запускает основной цикл приложения."""
+    setup_logging()
     print("Добро пожаловать в ValutaTrade Hub! Для выхода введите exit.")
     current_user = None
     while True:
