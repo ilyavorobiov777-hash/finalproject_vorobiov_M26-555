@@ -3,7 +3,15 @@
 import shlex
 
 from valutatrade_hub.core import usecases
+from valutatrade_hub.core.currencies import CURRENCIES
+from valutatrade_hub.core.exceptions import (
+    ApiRequestError,
+    CurrencyNotFoundError,
+    InsufficientFundsError,
+)
 from valutatrade_hub.core.utils import format_amount, format_rate
+from valutatrade_hub.infra.settings import SettingsLoader
+from valutatrade_hub.logging_config import setup_logging
 
 
 def parse_args(parts):
@@ -21,6 +29,7 @@ def parse_args(parts):
 
 def run():
     """Запускает основной цикл приложения."""
+    setup_logging()
     print("Добро пожаловать в ValutaTrade Hub! Для выхода введите exit.")
     current_user = None
     while True:
@@ -63,9 +72,13 @@ def run():
             if current_user is None:
                 print("Сначала выполните login")
                 continue
-            base = args.get("base", "USD").upper()
+            default_base = SettingsLoader().get("default_base_currency")
+            base = args.get("base", default_base).upper()
             try:
                 rows, total = usecases.show_portfolio(current_user, base)
+            except CurrencyNotFoundError:
+                print(f"Неизвестная базовая валюта '{base}'")
+                continue
             except ValueError as e:
                 print(e)
                 continue
@@ -95,6 +108,13 @@ def run():
                     rate, old, new, total = usecases.buy(current_user, code, amount)
                 else:
                     rate, old, new, total = usecases.sell(current_user, code, amount)
+            except InsufficientFundsError as e:
+                print(e)
+                continue
+            except CurrencyNotFoundError as e:
+                print(e)
+                print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                continue
             except ValueError as e:
                 print(e)
                 continue
@@ -119,6 +139,14 @@ def run():
                 continue
             try:
                 rate, updated = usecases.get_rate(from_code, to_code)
+            except CurrencyNotFoundError as e:
+                print(e)
+                print("Поддерживаемые валюты: " + ", ".join(CURRENCIES))
+                continue
+            except ApiRequestError as e:
+                print(e)
+                print("Повторите попытку позже или проверьте подключение к сети.")
+                continue
             except ValueError as e:
                 print(e)
                 continue
