@@ -51,8 +51,10 @@ class ExchangeRateApiClient(BaseApiClient):
             raise ApiRequestError(f"код ответа {response.status_code}")
 
         data = response.json()
+        if data.get("result") != "success":
+            raise ApiRequestError(data.get("error-type"))
         rates = {}
         for code in ParserConfig.FIAT_CURRENCIES:
-            if code in data["rates"]:
-                rates[f"{code}_{base}"] = 1 / data["rates"][code]
+            if code in data["conversion_rates"]:
+                rates[f"{code}_{base}"] = 1 / data["conversion_rates"][code]
         return rates
