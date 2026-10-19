@@ -2,6 +2,8 @@
 
 import shlex
 
+from prettytable import PrettyTable
+
 from valutatrade_hub.core import usecases
 from valutatrade_hub.core.currencies import CURRENCIES
 from valutatrade_hub.core.exceptions import (
@@ -86,9 +88,11 @@ def run():
                 print("У вас пока нет кошельков. Купите валюту командой buy.")
                 continue
             print(f"Портфель пользователя '{current_user.username}' (база: {base}):")
+            table = PrettyTable()
+            table.field_names = ["Валюта", "Баланс", f"Стоимость ({base})"]
             for code, balance, value in rows:
-                print(f"- {code}: {format_amount(code, balance)} → {value:.2f} {base}")
-            print("---------------------------------")
+                table.add_row([code, format_amount(code, balance), f"{value:,.2f}"])
+            print(table)
             print(f"ИТОГО: {total:,.2f} {base}")
         elif name == "buy" or name == "sell":
             if current_user is None:
@@ -120,10 +124,10 @@ def run():
                 continue
             if name == "buy":
                 print(f"Покупка выполнена: {format_amount(code, amount)} {code} "
-                      f"по курсу {rate} USD/{code}")
+                      f"по курсу {format_rate(rate)} USD/{code}")
             else:
                 print(f"Продажа выполнена: {format_amount(code, amount)} {code} "
-                      f"по курсу {rate} USD/{code}")
+                      f"по курсу {format_rate(rate)} USD/{code}")
             print("Изменения в портфеле:")
             print(f"- {code}: было {format_amount(code, old)} "
                   f"→ стало {format_amount(code, new)}")
@@ -150,9 +154,63 @@ def run():
             except ValueError as e:
                 print(e)
                 continue
-            updated = updated.replace("T", " ")
+            updated = updated.replace("T", " ").replace("Z", "")
             print(f"Курс {from_code}→{to_code}: {format_rate(rate)} "
                   f"(обновлено: {updated})")
             print(f"Обратный курс {to_code}→{from_code}: {format_rate(1 / rate)}")
+        elif name == "update-rates":
+            source = args.get("source")
+            if source not in (None, "coingecko", "exchangerate"):
+                print("Использование: update-rates [--source coingecko|exchangerate]")
+                continue
+            log_file = SettingsLoader().get("log_file")
+            print("INFO: Starting rates update...")
+            try:
+                results, count, last_refresh = usecases.update_rates(source)
+            except ApiRequestError as e:
+                print(f"ERROR: {e}")
+                print(f"Update failed. Check {log_file} for details.")
+                continue
+            has_errors = False
+            for client_name, client_count, error in results:
+                if error is None:
+                    print(f"INFO: Fetching from {client_name}... "
+                          f"OK ({client_count} rates)")
+                else:
+                    print(f"ERROR: Failed to fetch from {client_name}: {error}")
+                    has_errors = True
+            rates_file = SettingsLoader().get("rates_file")
+            print(f"INFO: Writing {count} rates to {rates_file}...")
+            if has_errors:
+                print(f"Update completed with errors. Check {log_file} for details.")
+            else:
+                print(f"Update successful. Total rates updated: {count}. "
+                      f"Last refresh: {last_refresh}")
+        elif name == "show-rates":
+            currency = args.get("currency")
+            if currency is not None:
+                currency = currency.upper()
+            base = args.get("base", "USD").upper()
+            top = None
+            if "top" in args:
+                try:
+                    top = int(args["top"])
+                except ValueError:
+                    print("'top' должен быть целым числом")
+                    continue
+            try:
+                rates, updated = usecases.show_rates(currency, top, base)
+            except CurrencyNotFoundError:
+                print(f"Неизвестная базовая валюта '{base}'")
+                continue
+            except ValueError as e:
+                print(e)
+                continue
+            print(f"Rates from cache (updated at {updated}):")
+            table = PrettyTable()
+            table.field_names = ["Пара", "Курс"]
+            for pair, rate in rates.items():
+                table.add_row([pair, format_rate(rate)])
+            print(table)
         else:
             print(f"Неизвестная команда: {name}")
