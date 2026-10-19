@@ -2,13 +2,20 @@
 
 import hashlib
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
 from valutatrade_hub.core.currencies import get_currency
 from valutatrade_hub.core.models import EXCHANGE_RATES, Portfolio, User, Wallet
 from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.config import ParserConfig
+from valutatrade_hub.parser_service.storage import RatesStorage
+from valutatrade_hub.parser_service.updater import RatesUpdater
 
 db = DatabaseManager()
 settings = SettingsLoader()
@@ -162,13 +169,15 @@ def sell(user, currency_code, amount):
     return rate, old_balance, wallet.balance, amount * rate
 
 
-def update_rates_from_stub():
-    """Записывает курсы из заглушки в rates.json."""
-    now = datetime.now().replace(microsecond=0).isoformat()
-    pairs = {}
-    for pair, rate in EXCHANGE_RATES.items():
-        pairs[pair] = {"rate": rate, "updated_at": now, "source": "stub"}
-    db.save_rates({"pairs": pairs, "last_refresh": now})
+def update_rates(source=None):
+    """Обновляет курсы через Parser Service."""
+    clients = {}
+    if source is None or source == "coingecko":
+        clients["CoinGecko"] = CoinGeckoClient()
+    if source is None or source == "exchangerate":
+        clients["ExchangeRate-API"] = ExchangeRateApiClient()
+    updater = RatesUpdater(clients, RatesStorage())
+    return updater.run_update()
 
 
 def rates_are_fresh():
@@ -177,7 +186,7 @@ def rates_are_fresh():
     if "last_refresh" not in data:
         return False
     last_refresh = datetime.fromisoformat(data["last_refresh"])
-    age = (datetime.now() - last_refresh).total_seconds()
+    age = (datetime.now(timezone.utc) - last_refresh).total_seconds()
     return age < settings.get("rates_ttl_seconds")
 
 
@@ -186,7 +195,7 @@ def get_rate(from_code, to_code):
     get_currency(from_code)
     get_currency(to_code)
     if not rates_are_fresh():
-        update_rates_from_stub()
+        update_rates()
     data = db.load_rates()
     try:
         rate = get_usd_rate(from_code) / get_usd_rate(to_code)
@@ -195,3 +204,34 @@ def get_rate(from_code, to_code):
             f"Курс {from_code}→{to_code} недоступен. Повторите попытку позже."
         )
     return rate, data["last_refresh"]
+
+
+def show_rates(currency=None, top=None, base="USD"):
+    """Курсы из кеша с фильтрами по валюте, топу и базе."""
+    data = db.load_rates()
+    rates = load_rates()
+    if rates is None:
+        raise ValueError(
+            "Локальный кеш курсов пуст. "
+            "Выполните 'update-rates', чтобы загрузить данные."
+        )
+    get_currency(base)
+    base_rate = get_usd_rate(base)
+    result = {}
+    for pair, rate in rates.items():
+        code = pair.split("_")[0]
+        if code != base:
+            result[f"{code}_{base}"] = rate / base_rate
+
+    if currency is not None:
+        result = {p: r for p, r in result.items() if p.startswith(currency + "_")}
+        if not result:
+            raise ValueError(f"Курс для '{currency}' не найден в кеше.")
+    if top is not None:
+        crypto = []
+        for pair, rate in result.items():
+            if pair.split("_")[0] in ParserConfig.CRYPTO_CURRENCIES:
+                crypto.append((pair, rate))
+        crypto.sort(key=lambda item: item[1], reverse=True)
+        result = dict(crypto[:top])
+    return result, data["last_refresh"]

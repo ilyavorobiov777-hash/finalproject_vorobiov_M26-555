@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from valutatrade_hub.parser_service.config import ParserConfig
 
@@ -20,7 +20,7 @@ class RatesStorage:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
     def save(self, rates, sources):
-        now = datetime.now().replace(microsecond=0).isoformat()
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         data = self.read_json(ParserConfig.RATES_FILE_PATH, {})
         pairs = data.get("pairs", {})
