@@ -27,8 +27,8 @@ class RatesUpdater:
                 rates[pair] = rate
                 sources[pair] = name
 
-        last_refresh = None
-        if rates:
-            last_refresh = self.storage.save(rates, sources)
-            logger.info(f"Saved {len(rates)} rates")
+        if not rates:
+            raise ApiRequestError("не удалось получить курсы ни от одного источника")
+        last_refresh = self.storage.save(rates, sources)
+        logger.info(f"Saved {len(rates)} rates")
         return results, len(rates), last_refresh
